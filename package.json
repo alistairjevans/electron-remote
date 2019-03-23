@@ -3,6 +3,7 @@
   "version": "1.3.0",
   "description": "Execute JavaScript in remote Electron processes, but more betterer",
   "scripts": {
+    "prepare": "npm run compile",
     "doc": "esdoc -c ./esdoc.json",
     "compile": "git clean -xdf ./lib && babel -d lib/ src/ && cp ./src/*.html ./lib/",
     "prepublish": "npm run compile",
