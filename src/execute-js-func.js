@@ -422,33 +422,45 @@ async function evalRemoteMethod(path, args) {
 
   return result;
 }
-
 /**
  * Invokes a method on a module in the main process.
  *
- * @param {string} moduleName         The name of the module to require
- * @param {Array<string>} methodChain The path to the module, e.g., ['dock', 'bounce']
- * @param {Array} args                The arguments to pass to the method
+ * @param {Object} includeModules        Additional non-electron modules to make available.     
+ * @param {string} moduleName            The name of the module to require
+ * @param {Array<string>} methodChain    The path to the module, e.g., ['dock', 'bounce']
+ * @param {Array} args                   The arguments to pass to the method
  *
- * @returns                           The result of calling the method
+ * @returns                              The result of calling the method
  *
  * @private
  */
-function executeMainProcessMethod(moduleName, methodChain, args) {
-  const theModule = electron[moduleName];
+function executeMainProcessMethod(includeModules, moduleName, methodChain, args) {
+  const theModule = includeModules[moduleName] || electron[moduleName];
   const path = methodChain.join('.');
   return get(theModule, path).apply(theModule, args);
 }
 
 /**
+ * @typedef InitializeOptions
+ * @property {Object} mainProcessModules An object containing a set of
+ *                                       imported modules you want to be accessible
+ *                                       from a renderer when using createProxyForMainProcessModule.
+ */
+
+/**
  * Initializes the IPC listener that {executeJavaScriptMethod} will send IPC
  * messages to. You need to call this method in any process that you want to
  * execute remote methods on.
- *
+ * @param  {InitializeOptions}  options An option object.
  * @return {Subscription}   An object that you can call `unsubscribe` on to clean up
  *                          the listener early. Usually not necessary.
  */
-export function initializeEvalHandler() {
+export function initializeEvalHandler(options) {
+  
+  options = Object.assign({
+    mainProcessModules: {}
+  }, options);
+  
   let listener = async function(e, receive) {
     d(`Got Message! ${JSON.stringify(receive)}`);
     let send = getReplyMethod(receive);
@@ -459,7 +471,7 @@ export function initializeEvalHandler() {
       } else {
         const parts = receive.path.split('.');
         if (parts.length > 1 && parts[0] === requireElectronModule) {
-          receive.result = executeMainProcessMethod(parts[1], parts.splice(2), receive.args);
+          receive.result = executeMainProcessMethod(options.mainProcessModules, parts[1], parts.splice(2), receive.args);
         } else {
           receive.result = await evalRemoteMethod(receive.path, receive.args);
         }
